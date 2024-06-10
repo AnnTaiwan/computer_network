@@ -5,13 +5,13 @@ CC = gcc
 CFLAGS = -Wall -g
 
 # Source files
-SRCS = client.c server.c tcp.c
+SRCS = client.c server.c tcp.c cal.c
 
 # Header files
-HDRS = tcp.h
+HDRS = tcp.h cal.h
 
 # Object files
-OBJS = tcp.o client.o server.o 
+OBJS = tcp.o cal.o client.o server.o 
 
 # Executable names
 CLIENT_EXE = client
@@ -25,8 +25,8 @@ $(CLIENT_EXE): client.o tcp.o
 	$(CC) $(CFLAGS) -o $@ client.o tcp.o
 
 # Compile server
-$(SERVER_EXE): server.o tcp.o
-	$(CC) $(CFLAGS) -o $@ server.o tcp.o
+$(SERVER_EXE): server.o tcp.o cal.o
+	$(CC) $(CFLAGS) -o $@ server.o tcp.o cal.o -lm
 
 # Compile client.o
 client.o: client.c $(HDRS)
@@ -40,6 +40,10 @@ server.o: server.c $(HDRS)
 tcp.o: tcp.c $(HDRS)
 	$(CC) $(CFLAGS) -c tcp.c
 
+# Compile cal.o
+cal.o: cal.c $(HDRS)
+	$(CC) $(CFLAGS) -c cal.c 
+	
 # Clean up the project
 clean:
 	rm -f $(CLIENT_EXE) $(SERVER_EXE) $(OBJS)
