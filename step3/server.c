@@ -146,9 +146,6 @@ void handle_dns_query(int client_fd, int server_fd) {
             printf("\t(3)Receive packet : ACK => SEQ=%d : ACK=%d\n", seg3.sequence_num, seg3.acknowledgment);
         } else {
             printf("Unexpected packet flags: %d\n", seg3.flags);
-            close(client_fd);
-            close(server_fd);
-            exit(EXIT_FAILURE);
         }
 }
 
@@ -191,9 +188,7 @@ void handle_calculation(int client_fd, int server_fd) {
             printf("\t(3)Receive packet : ACK => SEQ=%d : ACK=%d\n", seg3.sequence_num, seg3.acknowledgment);
         } else {
             printf("Unexpected packet flags: %d\n", seg3.flags);
-            close(client_fd);
-            close(server_fd);
-            exit(EXIT_FAILURE);
+            
         }
 	
     
@@ -346,9 +341,7 @@ void handle_client(int client_fd, int server_fd, struct sockaddr_in client_addr,
             
         } else {
             printf("Unexpected packet flags: %d\n", seg3.flags);
-            close(client_fd);
-            close(server_fd);
-            exit(EXIT_FAILURE);
+
         }
     }
     

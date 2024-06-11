@@ -131,8 +131,7 @@ void perform_file_transfer(char *name, int server_fd) {
 		    strcat(buffer, response.data);
 		} else {
 		    printf("Unexpected packet flags: %d\n", response.flags);
-		    close(server_fd);
-		    exit(EXIT_FAILURE);
+		    
 		}
     
 	
@@ -176,8 +175,7 @@ void perform_dns_query(char *name, int server_fd){
         
     } else {
         printf("Unexpected packet flags: %d\n", response.flags);
-        close(server_fd);
-        exit(EXIT_FAILURE);
+        
     }
     
 	
@@ -216,8 +214,7 @@ void perform_calculation(char *name, int server_fd){
         
     } else {
         printf("Unexpected packet flags: %d\n", response.flags);
-        close(server_fd);
-        exit(EXIT_FAILURE);
+        
     }
 	// result
 	printf("Calculation result for %s =  %s\n", name, response.data);
@@ -323,8 +320,7 @@ int main(int argc, char**argv)
         server_isn = response.sequence_num;
     } else {
         printf("Unexpected packet flags: %d\n", response.flags);
-        close(sock);
-        exit(EXIT_FAILURE);
+        
     }
 	
     // Send ACK
