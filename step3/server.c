@@ -388,11 +388,6 @@ void transport_file(char* name, int client_fd, int server_fd)
 		printf("#######slow start#######\n");
     	int len=0,seq=1;
     	int count = 0;
-    	
-        //char buffer[BUFFER_SIZE];
-		//size_t bytes_read;
-		//uint32_t seq_num = temp_ack;
-		//int num_packets = 0;
     
 		while(1)
 		{
@@ -400,15 +395,16 @@ void transport_file(char* name, int client_fd, int server_fd)
 			if(cwnd>32768) 
 				cwnd=32768;
         	printf("cwnd = %d, rwnd = %d, threshold = %d \n",cwnd, rwnd ,THRESHOLD);
-        	int temp=cwnd;	//when cwnd > 1024, cut cwnd into segment, and every segment's size is 1 MSS
-			if(cwnd>1024)
+        	int temp=cwnd;	
+			if(cwnd>1024) //when cwnd > 1024, cut cwnd into segment, and every segment's size is 1 MSS
 			{
 				while (temp>0)
 				{
 					printf("\tSend a packet at %d byte\n",seq);
+					memset(seg2.data, 0, sizeof(seg2.data));
 					if((len = fread(seg2.data, sizeof(char), MSS, fp))>0)
 					{
-						initialize_tcp_segment(&seg2);
+						
 						seg2.src_port = SERVER_PORT;
 						seg2.dst_port = seg3.src_port;
 						if(count == 0)
@@ -481,6 +477,9 @@ void transport_file(char* name, int client_fd, int server_fd)
 								seg2.acknowledgment = seg3.sequence_num+1+strlen(seg3.data);
 							}
 							strcpy(seg2.data, "FINISH");
+							char temp[20];
+ 							sprintf(temp, "%d", seq - 1); // turn seq-1 into string and saved in temp
+ 							strcat(seg2.data, temp); // cat temp in the end of seg2.data
 							set_flag(&seg2, PSH_FLAG);
 							set_flag(&seg2, ACK_FLAG);
 							send(client_fd, &seg2, sizeof(seg2), 0);
@@ -493,7 +492,8 @@ void transport_file(char* name, int client_fd, int server_fd)
 			else if (cwnd<=1024)
 			{
 				printf("\tSend a packet at %d byte\n",seq);
-				initialize_tcp_segment(&seg2);
+				//initialize_tcp_segment(&seg2);
+				memset(seg2.data, 0, sizeof(seg2.data));
 				if((len = fread(seg2.data, sizeof(char), cwnd, fp))>0)
 				{
 						seg2.src_port = SERVER_PORT;
@@ -571,6 +571,9 @@ void transport_file(char* name, int client_fd, int server_fd)
 						seg2.acknowledgment = seg3.sequence_num+1+strlen(seg3.data);
 					}
 					strcpy(seg2.data, "FINISH");
+					char temp[20];
+					sprintf(temp, "%d", seq - 1); // turn seq-1 into string and saved in temp
+					strcat(seg2.data, temp); // cat temp in the end of seg2.data
 					set_flag(&seg2, PSH_FLAG);
 					set_flag(&seg2, ACK_FLAG);
 		        	send(client_fd, &seg2, sizeof(seg2), 0);
@@ -595,6 +598,9 @@ void transport_file(char* name, int client_fd, int server_fd)
 						seg2.acknowledgment = seg3.sequence_num+1+strlen(seg3.data);
 					}
 					strcpy(seg2.data, "FINISH");
+					char temp[20];
+ 					sprintf(temp, "%d", seq - 1); // turn seq-1 into string and saved in temp
+					strcat(seg2.data, temp); // cat temp in the end of seg2.data
 					set_flag(&seg2, PSH_FLAG);
 					set_flag(&seg2, ACK_FLAG);
 		        	send(client_fd, &seg2, sizeof(seg2), 0);

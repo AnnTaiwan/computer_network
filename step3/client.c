@@ -88,6 +88,7 @@ int receive_pkt(int server_fd, char *str, struct TCP_segment seg)
 }
 void perform_file_transfer(char *name, int server_fd) {
 	char buffer[BUFFER_SIZE*BUFFER_SIZE];
+	long int total_bytes = 0;
 	memset(buffer, 0, sizeof(buffer));
 	
     printf("Now, IN file_transfer: %s\n", name);
@@ -125,9 +126,14 @@ void perform_file_transfer(char *name, int server_fd) {
 		if (response.flags & PSH_FLAG && response.flags & ACK_FLAG) { // check the flags if ACK and PSH
 		    //printf("(Received SYN-ACK packet...)\n");
 		    printf("\tReceive packet : PSH-ACK => SEQ=%d : ACK=%d\n", response.sequence_num, response.acknowledgment);
-		    if(strcmp(response.data, "FINISH") == 0) 
+		    if(strncmp(response.data, "FINISH", 6) == 0) 
+			{
+				strcat(buffer, "\nTotally receive ");
+				strcat(buffer, response.data + 6);
+				total_bytes = atoi(response.data + 6);
+				strcat(buffer, " bytes.\n");
 				break;
-				
+			}
 		    strcat(buffer, response.data);
 		} else {
 		    printf("Unexpected packet flags: %d\n", response.flags);
@@ -152,7 +158,13 @@ void perform_file_transfer(char *name, int server_fd) {
 	}
 	// result
 	printf("Result:\n");
-	printf("%s\n", buffer);
+	if (strncmp(name + strlen(name) - 4, ".txt", 4) == 0) {
+		printf("%s\n", buffer);
+	}
+	else
+	{
+		printf("Totally receive %ld bytes.\n", total_bytes);
+	}
 }
 
 void perform_dns_query(char *name, int server_fd){

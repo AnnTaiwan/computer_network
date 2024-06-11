@@ -3,7 +3,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #define TCP_OPT_MAX 40 // Maximum length for TCP options
-#define MAX_DATA_SIZE 1024
+#define MAX_DATA_SIZE 1024*2
 
 #define URG_FLAG 0x20 // 00100000
 #define ACK_FLAG 0x10 // 00010000
