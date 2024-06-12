@@ -126,7 +126,10 @@ void perform_file_transfer(char *name, int server_fd) {
 		}
 		if (response.flags & PSH_FLAG && response.flags & ACK_FLAG) { // check the flags if ACK and PSH
 		    //printf("(Received SYN-ACK packet...)\n");
-		    printf("\tReceive packet : PSH-ACK => SEQ=%d : ACK=%d\n", response.sequence_num, response.acknowledgment);
+		    if(delay == 0)
+		    	printf("\tReceive packet : PSH-ACK => SEQ=%d : ACK=%d (delay acked)\n", response.sequence_num, response.acknowledgment);
+		    else if(delay == 1)
+		    	printf("\tReceive packet : PSH-ACK => SEQ=%d : ACK=%d\n", response.sequence_num, response.acknowledgment);
 		    delay++; // cal wait packet number already
 		    if(strncmp(response.data, "FINISH", 6) == 0) 
 			{
