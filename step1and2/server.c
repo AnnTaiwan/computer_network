@@ -22,7 +22,7 @@ int RTT = 30;       		// ms
 int MSS = 1024; 		 	// 1 Kbytes
 int THRESHOLD = 65536; 		// 64 Kbytes
 int RBUFFER_SZIE = 524288; 	// 512 Kbytes
-int cwnd = 1, rwnd=32768;
+int cwnd = 1024, rwnd=32768;
 
 uint16_t SERVER_PORT = 0;
 struct TCP_segment seg1, seg2, seg3;
@@ -446,7 +446,7 @@ void transport_file(char* name, int client_fd, int server_fd)
 		        			return;
 					}
 				}
-				cwnd*=2;
+				cwnd += MSS;
 			}
 			else if (cwnd<=1024)
 			{
@@ -496,7 +496,7 @@ void transport_file(char* name, int client_fd, int server_fd)
 						}
 					
 					
-					cwnd*=2;
+					cwnd += MSS;
 				}
 	        	else
 	        	{
