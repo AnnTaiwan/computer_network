@@ -516,10 +516,9 @@ void transport_file(char* name, int client_fd, int server_fd)
 						printf("#######fast recovery#######\n");
 						rwnd = 32768;
 						THRESHOLD = cwnd / 2;
-						cwnd = THRESHOLD;	// TCP Reno
+						cwnd = THRESHOLD + 2 * MSS;	// TCP Reno, here THRESHOLD plus two MSS because later it will add another MSS
+						// So, it will become cwnd = THRESHOLD + 3 * MSS
 						printf("#######slow start#######\n");
-						printf("cwnd = %d, rwnd = %d, threshold = %d \n",cwnd, rwnd ,THRESHOLD);
-						printf("########################\n");
 						in_cong_avo = 0;
 						con_print = 1;
 						break;
