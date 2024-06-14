@@ -509,16 +509,19 @@ void transport_file(char* name, int client_fd, int server_fd)
 					else 
 					    rwnd-=MSS;
 					// fast retransmit
-					if(dup == 2)
+					if(dup == 2) // dup counts from 0, when it equal to 2, which means it encountered three duplicate acks. So do the fast retransmit
 					{
 						dup = 0; // reset the dup
 						printf("***Receive three duplicate ack.\n");
-						printf("#######fast retransmit#######\n");
+						printf("#######fast recovery#######\n");
 						rwnd = 32768;
 						THRESHOLD = cwnd / 2;
-						cwnd = THRESHOLD;	// TCP Tahoe always sets cwnd to 1
+						cwnd = THRESHOLD;	// TCP Reno
 						printf("#######slow start#######\n");
+						printf("cwnd = %d, rwnd = %d, threshold = %d \n",cwnd, rwnd ,THRESHOLD);
+						printf("########################\n");
 						in_cong_avo = 0;
+						con_print = 1;
 						break;
 					}
 					temp -= MSS;

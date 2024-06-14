@@ -390,6 +390,8 @@ void transport_file(char* name, int client_fd, int server_fd)
     	int count = 0;
     	int in_cong_avo = 0; // 0 means not in congestion avoidence, 1 means in
     	int con_print = 1; // 0 means it already print the line: "#######congestion avoidence#######\n"
+    	int drop_packet = 0; // 0 means it not get to the 8192 bytes
+    	int finish_signal = 0; // 1 means finish reading the file
 		while(1)
 		{
 			
@@ -408,37 +410,45 @@ void transport_file(char* name, int client_fd, int server_fd)
 						con_print = 0; // let it won't print this line again
 					}
 				}
-				while (temp>0)
+				while (temp>0) // keep sending
 				{
 					printf("\tSend a packet at %d byte\n",seq);
 					memset(seg2.data, 0, sizeof(seg2.data));
-					if((len = fread(seg2.data, sizeof(char), MSS, fp))>0)
+					if(seq == 8192)
+					{
+						drop_packet = 1; // drop this packet at 8192 bytes
+					}
+					else
+						drop_packet = 0; // Don't drop the packet
+						
+					if (drop_packet || simulate_packet_loss()) // Simulate packet loss
+					{ 
+						printf("**Packet loss at %d bytes: SEQ=%d : ACK=%d\n", seq, seg2.sequence_num, seg2.acknowledgment);
+						seg2.checksum = 1; // indicate bad packet
+						// skip to read next msg
+						seq += MSS;
+						temp -= MSS; // give up this packet
+					}
+					else if((len = fread(seg2.data, sizeof(char), MSS, fp))>0) // read the file
 					{
 						
+						seg2.checksum = 0;
 						seg2.src_port = SERVER_PORT;
 						seg2.dst_port = seg3.src_port;
 						if(count == 0)
 						{
 							seg2.sequence_num = seg1.acknowledgment;
-							seg2.acknowledgment = seg1.sequence_num+1+strlen(seg1.data);
+							seg2.acknowledgment = seg1.sequence_num+1+len;
 							count++;
 						}
 						else
 						{
 							seg2.sequence_num = seg3.acknowledgment;
-							seg2.acknowledgment = seg3.sequence_num+1+strlen(seg3.data);
+							seg2.acknowledgment = seg3.sequence_num+1+len;
 						}
-						//strcpy(seg2.data, data);
 						set_flag(&seg2, PSH_FLAG);
 						set_flag(&seg2, ACK_FLAG);
 						seq+=len;
-						// Simulate packet loss
-						if (simulate_packet_loss()) {
-							printf("**Packet loss: SEQ=%d : ACK=%d\n", seg2.sequence_num, seg2.acknowledgment);
-							seg2.checksum = 1; // indicate bad packet
-						}
-						else 
-							seg2.checksum = 0;
         				// send packet
 						if (send(client_fd, &seg2, sizeof(seg2), 0) < 0) {
 							perror("send failed");
@@ -447,56 +457,101 @@ void transport_file(char* name, int client_fd, int server_fd)
 							exit(EXIT_FAILURE);
 						}
 						printf("\t(1)Send a packet : PCH-ACK => SEQ=%d : ACK=%d\n", seg2.sequence_num, seg2.acknowledgment);
+						temp-=MSS;
 						
-						// receive seg3 and retransmit if happening time_out situation
-						int re = receive_ack(client_fd, "PCH-ACK");
-						if(re < 0) {
-							perror("receive failed, expecting ACK");
-							close(client_fd);
-							close(server_fd);
-							exit(EXIT_FAILURE);
-						}
-
+					}
+					else // finish transmit the files
+					{
+						finish_signal = 1;
+						break;
+					}
+					
+				}	
+				temp = cwnd;
+				int dup = 0;
+				int pre_ack = 0;
+				while(temp > 0) // keep receiving
+				{
+					// receive seg3 and retransmit if happening time_out situation
+					int re = receive_ack(client_fd, "PCH-ACK");
+					if(re < 0) {
+						perror("receive failed, expecting ACK");
+						close(client_fd);
+						close(server_fd);
+						exit(EXIT_FAILURE);
+					}
+					
+					if(pre_ack == seg3.acknowledgment) //duplicate ack
+					{
+						dup++;
+						
 						if (seg3.flags & ACK_FLAG) {
 							printf("\t(2)Receive packet : ACK => SEQ=%d : ACK=%d\n", seg3.sequence_num, seg3.acknowledgment);
-							if(rwnd-MSS<0) 
-			            		rwnd+=32768-MSS;
-			            	else 
-			            		rwnd-=MSS;
 						} 
 						else {
 							printf("After receiving SEQ=%d : ACK=%d. Unexpected packet flags: %d\n", seg3.sequence_num, seg3.acknowledgment, seg3.flags);
 						}
-						
-						temp-=MSS;
 					}
 					else
 					{
-		        			initialize_tcp_segment(&seg2);
-							seg2.src_port = SERVER_PORT;
-							seg2.dst_port = seg3.src_port;
-							if(count == 0)
-							{
-								seg2.sequence_num = seg1.acknowledgment;
-								seg2.acknowledgment = seg1.sequence_num+1+strlen(seg1.data);
-								count++;
-							}
-							else
-							{
-								seg2.sequence_num = seg3.acknowledgment;
-								seg2.acknowledgment = seg3.sequence_num+1+strlen(seg3.data);
-							}
-							strcpy(seg2.data, "FINISH");
-							char temp[20];
- 							sprintf(temp, "%d", seq - 1); // turn seq-1 into string and saved in temp
- 							strcat(seg2.data, temp); // cat temp in the end of seg2.data
-							set_flag(&seg2, PSH_FLAG);
-							set_flag(&seg2, ACK_FLAG);
-							send(client_fd, &seg2, sizeof(seg2), 0);
-							printf("file successfully transmit\n");
-		        			return;
+						dup = 0; // reset dup
+						if (seg3.flags & ACK_FLAG) {
+							printf("\t(2)Receive packet : ACK => SEQ=%d : ACK=%d\n", seg3.sequence_num, seg3.acknowledgment);
+						} 
+						else {
+							printf("After receiving SEQ=%d : ACK=%d. Unexpected packet flags: %d\n", seg3.sequence_num, seg3.acknowledgment, seg3.flags);
+						}
+					}	
+					pre_ack = seg3.acknowledgment;
+					// after receive the packet, adjust the rwnd
+					if(rwnd-MSS<0) 
+					    rwnd+=32768-MSS;
+					else 
+					    rwnd-=MSS;
+					// fast retransmit
+					if(dup == 2) // dup counts from 0, when it equal to 2, which means it encountered three duplicate acks. So do the fast retransmit
+					{
+						dup = 0; // reset the dup
+						printf("***Receive three duplicate ack.\n");
+						printf("#######fast retransmit#######\n");
+						rwnd = 32768;
+						THRESHOLD = cwnd / 2;
+						cwnd = 0;	// TCP Tahoe always sets cwnd to 1 MSS, later will add 1 MSS, so cwnd will become 1024
+						printf("#######slow start#######\n");
+						in_cong_avo = 0; // back to slow start mode
+						break;
 					}
+					temp -= MSS;
+				}		
+				
+				// sending the last packet
+				if(finish_signal) // finish reading the file
+				{
+				    initialize_tcp_segment(&seg2);
+					seg2.src_port = SERVER_PORT;
+					seg2.dst_port = seg3.src_port;
+					if(count == 0)
+					{
+						seg2.sequence_num = seg1.acknowledgment;
+						seg2.acknowledgment = seg1.sequence_num+1+strlen(seg1.data);
+						count++;
+					}
+					else
+					{
+						seg2.sequence_num = seg3.acknowledgment;
+						seg2.acknowledgment = seg3.sequence_num+1+strlen(seg3.data);
+					}
+					strcpy(seg2.data, "FINISH");
+					char temp[20];
+	 				sprintf(temp, "%d", seq - 1); // turn seq-1 into string and saved in temp
+	 				strcat(seg2.data, temp); // cat temp in the end of seg2.data
+					set_flag(&seg2, PSH_FLAG);
+					set_flag(&seg2, ACK_FLAG);
+					send(client_fd, &seg2, sizeof(seg2), 0);
+					printf("file successfully transmit\n");
+				    return;
 				}
+				
 				if(in_cong_avo == 0) // slow start stage
 					cwnd += MSS;
 				else  // congestion control stage
@@ -601,33 +656,6 @@ void transport_file(char* name, int client_fd, int server_fd)
 		        	return;
 		       	}
 			}
-	        	else
-	        	{
-	        		initialize_tcp_segment(&seg2);
-					seg2.src_port = SERVER_PORT;
-					seg2.dst_port = seg3.src_port;
-					if(count == 0)
-					{
-						seg2.sequence_num = seg1.acknowledgment;
-						seg2.acknowledgment = seg1.sequence_num+1+strlen(seg1.data);
-						count++;
-					}
-					else
-					{
-						seg2.sequence_num = seg3.acknowledgment;
-						seg2.acknowledgment = seg3.sequence_num+1+strlen(seg3.data);
-					}
-					strcpy(seg2.data, "FINISH");
-					char temp[20];
- 					sprintf(temp, "%d", seq - 1); // turn seq-1 into string and saved in temp
-					strcat(seg2.data, temp); // cat temp in the end of seg2.data
-					set_flag(&seg2, PSH_FLAG);
-					set_flag(&seg2, ACK_FLAG);
-		        	send(client_fd, &seg2, sizeof(seg2), 0);
-		        	printf("file successfully transmit\n");
-	        		fclose(fp);
-	        		return;
-	        	}
 		}
 	}
 	
